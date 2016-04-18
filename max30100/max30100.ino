@@ -6,7 +6,14 @@ MAX30100 sensor;
 boolean getInterruption = false;
 unsigned long previousMillis = 0;
 // constants won't change :
-const long interval = 10;
+const long interval = 20;
+
+        int thresh = 0;
+        boolean Pulse, firstBeat, secondBeat;
+        int BPM, IBI, P, T, amp;
+        int Signal;
+        int rate[10];
+        unsigned long lastBeatTime, sampleCounter;
 
 void setup() {
   // put your setup code here, to run once:
@@ -25,17 +32,50 @@ void loop() {
                  // not forgetting unprintable and null term chars
   //sprintf(buffer,"var1:%i\tvar2:%i\tvar3:%i",var1,var2,var3);
   //Serial.println(buffer);
-
+  static unsigned long upStartedTime, upStopedTime, IBI;
+  static boolean upStarted = false;
   unsigned long currentMillis = millis();
+  int IRData, HR, biggestIR, lowestIR;
+  
   if (currentMillis - previousMillis >= interval) {
     // save the last time you blinked the LED
-    previousMillis = currentMillis;
+   previousMillis = currentMillis;
     //sensor.GetTemp();
     sensor.readSensor();
-    //Serial.println(meanDiff(sensor.IR));
-    //sprintf(buffer,"%d %d",meanDiff(sensor.IR),meanDiff(sensor.RED));
-    sprintf(buffer,"%d,",meanDiff(sensor.IR));
+    
+    IRData = meanDiff(sensor.IR);
+    getBPM();
+    sprintf(buffer,"%d %d",0,BPM);
     Serial.println(buffer);
+    /*
+    if(IRData > lowestIR && !upStarted){
+      upStarted = true;
+      upStartedTime = currentMillis;
+      Serial.println("IBI started");
+    }
+    if(IRData > biggestIR){
+      biggestIR = IRData;
+    }
+    if(IRData < lowestIR){
+      lowestIR = IRData;
+    }
+    if(IRData < 0){
+      biggestIR = 0;
+    }
+    if(IRData < biggestIR && upStarted){
+      upStarted = false;
+      upStopedTime = currentMillis;
+      Serial.println("IBI stoped");
+      IBI = upStopedTime - upStartedTime;
+      HR = 60000 / IBI;
+      Serial.println(HR);
+    }
+    
+    
+    //sprintf(buffer,"%d %d %d %d,",IRData,0, upStartedTime, upStopedTime);
+    //Serial.println(buffer);
+    
+    */
   }
 
   if (getInterruption) {
@@ -91,4 +131,75 @@ long meanDiff(int M) {
 
   avg = sum / count;
   return avg - M;
+}
+
+void getBPM(){
+
+        Signal = meanDiff(sensor.IR);
+        // We take a reading every 0.05 seconds
+        sampleCounter = millis();                        // keep track of the time in mS with this variable
+        int N = sampleCounter - lastBeatTime;       // monitor the time since the last beat to avoid noise
+ 
+        // Find the peak and trough of the pulse wave
+        if(Signal < thresh && N > (IBI/5)*3){       // avoid dichrotic noise by waiting 3/5 of last IBI
+            if (Signal < T){                        // T is the trough
+                T = Signal;                         // keep track of lowest point in pulse wave
+            }
+        }
+ 
+        if(Signal > thresh && Signal > P){          // thresh condition helps avoid noise
+            P = Signal;                             // P is the peak
+        }                                           // keep track of highest point in pulse wave
+ 
+        // Look for the heart beat
+        if (N > 250){                               // avoid high frequency noise
+            if ( (Signal > thresh) && (Pulse == false) && (N > (IBI/5)*3) ){
+                Pulse = true;                       // set the Pulse flag when we think there is a pulse
+                IBI = sampleCounter - lastBeatTime; // measure time between beats in mS
+                lastBeatTime = sampleCounter;       // keep track of time for next pulse
+ 
+                if(secondBeat){                     // if this is the second beat, if secondBeat == TRUE
+                    secondBeat = false;             // clear secondBeat flag
+                    for(int i=0; i<=9; i++){        // seed the running total to get a realisitic BPM at startup
+                        rate[i] = IBI;
+                    }
+                }
+ 
+                if(firstBeat){                      // if it’s the first time we found a beat, if firstBeat == TRUE
+                    Serial.println("first beat");
+                    firstBeat = false;              // clear firstBeat flag
+                    secondBeat = true;              // set the second beat flag
+                    return;                         // IBI value is unreliable so discard it
+                }
+ 
+                // Keep a running total of the last 10 IBI values
+                int runningTotal = 0;               // clear the runningTotal variable
+                for(int i=0; i<=8; i++){            // shift data in the rate array
+                    rate[i] = rate[i+1]; 
+                    runningTotal += rate[i];    
+                }
+ 
+                rate[9] = IBI;   // add the latest IBI to the rate array
+                runningTotal += rate[9]; // add the latest IBI to runningTotal
+                runningTotal /= 10;                 // average the last 10 IBI values
+                BPM = 60000/runningTotal;           // get the beats per minutes -> BPM
+            }
+        }
+ 
+        if (Signal < thresh && Pulse == true){      // when the values are going down, the beat is over
+            Pulse = false;                          // reset the Pulse flag so we can do it again
+            amp = P - T;                            // get amplitude of the pulse wave
+            thresh = amp/2 + T;                     // set thresh at 50% of the amplitude
+            P = thresh;                             // reset these for next time
+            T = thresh;
+        }
+ 
+        if (N > 2500){                              // if 2.5 seconds go by without a beat -> reset
+            thresh = 250;                           // set thresh default
+            P = 250;                                // set P default
+            T = 250;                                // set T default
+            lastBeatTime = sampleCounter;           // bring the lastBeatTime up to date
+            firstBeat = true;                       // set these to avoid noise
+            secondBeat = false;                     // when we get the heartbeat back
+        }
 }
