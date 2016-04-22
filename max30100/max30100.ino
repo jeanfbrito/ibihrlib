@@ -14,6 +14,7 @@ const long interval = 20;
         int Signal;
         int rate[10];
         unsigned long lastBeatTime, sampleCounter;
+        int lastBPM;
 
 void setup() {
   // put your setup code here, to run once:
@@ -45,8 +46,12 @@ void loop() {
     
     IRData = meanDiff(sensor.IR);
     getBPM();
-    sprintf(buffer,"%d %d",0,BPM);
-    Serial.println(buffer);
+    if(lastBPM != BPM){
+      sprintf(buffer,"%d %d",0,BPM);
+      Serial.println(buffer);
+      lastBPM = BPM;
+    }
+
     /*
     if(IRData > lowestIR && !upStarted){
       upStarted = true;
