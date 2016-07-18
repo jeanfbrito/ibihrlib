@@ -6,8 +6,7 @@ MAX30100 sensor;
 boolean getInterruption = false;
 unsigned long previousMillis = 0;
 // constants won't change :
-const long interval = 20;
-
+const long interval = 20; //this changes the sample rate time, 10 is fast, 20 is slow
         int thresh = 0;
         boolean Pulse, firstBeat, secondBeat;
         int BPM, IBI, P, T, amp;
@@ -35,52 +34,29 @@ void loop() {
   //Serial.println(buffer);
   static unsigned long upStartedTime, upStopedTime, IBI;
   static boolean upStarted = false;
-  unsigned long currentMillis = millis();
   int IRData, HR, biggestIR, lowestIR;
   
+  unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
     // save the last time you blinked the LED
-   previousMillis = currentMillis;
+    previousMillis = currentMillis;
     //sensor.GetTemp();
     sensor.readSensor();
-    
-    IRData = meanDiff(sensor.IR);
+    //Serial.println(meanDiff(sensor.IR));
+    //sprintf(buffer,"%d %d",meanDiff(sensor.IR),meanDiff(sensor.RED));
+
+    //This show the Heart rate numbers
+    /*IRData = meanDiff(sensor.IR);
     getBPM();
     if(lastBPM != BPM){
       sprintf(buffer,"%d %d",0,BPM);
       Serial.println(buffer);
       lastBPM = BPM;
-    }
+    }*/
 
-    /*
-    if(IRData > lowestIR && !upStarted){
-      upStarted = true;
-      upStartedTime = currentMillis;
-      Serial.println("IBI started");
-    }
-    if(IRData > biggestIR){
-      biggestIR = IRData;
-    }
-    if(IRData < lowestIR){
-      lowestIR = IRData;
-    }
-    if(IRData < 0){
-      biggestIR = 0;
-    }
-    if(IRData < biggestIR && upStarted){
-      upStarted = false;
-      upStopedTime = currentMillis;
-      Serial.println("IBI stoped");
-      IBI = upStopedTime - upStartedTime;
-      HR = 60000 / IBI;
-      Serial.println(HR);
-    }
-    
-    
-    //sprintf(buffer,"%d %d %d %d,",IRData,0, upStartedTime, upStopedTime);
-    //Serial.println(buffer);
-    
-    */
+    //This shows the graphic heart beats
+    sprintf(buffer,"%d,",meanDiff(sensor.IR));
+    Serial.println(buffer);
   }
 
   if (getInterruption) {
@@ -208,3 +184,4 @@ void getBPM(){
             secondBeat = false;                     // when we get the heartbeat back
         }
 }
+
